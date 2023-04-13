@@ -17,6 +17,7 @@ class Config:
     device_name: str = "cuda"
     device: torch.device = torch.device("cuda")
     label_nc: int = 19
+    output_nc: int = 3
     model_path: Optional[str] = None
 
 

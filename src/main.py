@@ -24,7 +24,7 @@ if __name__ == "__main__":
     source_label_pil = Image.open("source_label.png")
 
     seg, _ = model.preprocess(source_label_pil)
-    output = model(seg, style_codes=style_codes)
+    output = model.generate(seg, style_codes=style_codes)
     save_image(output[0], "output.png")
 
     image_np = output.squeeze(0).detach().cpu().float().numpy()

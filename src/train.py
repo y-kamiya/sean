@@ -28,8 +28,8 @@ def main():
         pin_memory=True,
     )
 
-    trainer = Trainer(args, logger)
-    trainer.train(dataloader)
+    trainer = Trainer(args, logger, dataloader)
+    trainer.train()
 
 
 if __name__ == "__main__":

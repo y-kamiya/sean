@@ -54,10 +54,10 @@ class ImageMaskDataset(Dataset):
         image = None
         if image_pil is not None:
             transform_image = self.build_transform(params)
-            image = transform_image(image_pil).to(self.config.device)
+            image = transform_image(image_pil)
 
         transform_label = self.build_transform(params, Image.Resampling.NEAREST, False)
-        label = transform_label(label_pil).to(self.config.device)
+        label = transform_label(label_pil)
 
         label = label * 255.0
         label[label == 255] = self.config.label_nc

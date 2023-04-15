@@ -6,23 +6,30 @@ from torch.utils import tensorboard
 from torch.optim.lr_scheduler import LinearLR
 from dataclasses import dataclass
 from typing import Optional
+from accelerate import Accelerator
 
 from .model import SEAN, TrainerConfig
 
 
 class Trainer:
-    def __init__(self, config: TrainerConfig, logger: Logger):
+    def __init__(self, config: TrainerConfig, logger: Logger, dataloader: DataLoader):
         self.config = config
         self.logger = logger
+        self.dataloader = dataloader
+
         self.model = SEAN(config)
         self.optimizer_G, self.optimizer_D = self.model.create_optimizers()
         self.lr_decay_start = config.epochs // 2
         self.schedulerG = LinearLR(self.optimizer_G, 1.0, 0.0, self.lr_decay_start)
         self.schedulerD = LinearLR(self.optimizer_D, 1.0, 0.0, self.lr_decay_start)
 
-    def train(self, dataloader: DataLoader):
+        self.accelerator = Accelerator(split_batches=True)
+        self.model, self.optimizer_G, self.optimizer_D, self.dataloader, self.schedulerG, self.schedulerD = \
+            self.accelerator.prepare(self.model, self.optimizer_G, self.optimizer_D, self.dataloader, self.schedulerG, self.schedulerD)
+
+    def train(self):
         for epoch in range(self.config.epochs):
-            self.train_epoch(epoch, dataloader)
+            self.train_epoch(epoch, self.dataloader)
 
             if epoch % self.config.eval_interval == 0:
                 self.save(epoch)
@@ -30,7 +37,7 @@ class Trainer:
     def train_epoch(self, epoch: int, dataloader: DataLoader):
         start_time = time.time()
 
-        for i, data in enumerate(dataloader):
+        for i, data in enumerate(self.dataloader):
             self.train_generator(i, data)
             self.train_discriminator(i, data)
 
@@ -43,11 +50,11 @@ class Trainer:
         start_time = time.time()
 
         self.optimizer_G.zero_grad()
-        losses, generated = self.model(data["image"], data["label"], mode="generator")
+        losses, generated = self.accelerator.unwrap_model(self.model).loss_generator(data["image"], data["label"])
         lambda_fm = self.config.lambda_fm
         lambda_vgg = self.config.lambda_vgg
         loss = losses["GAN"] + lambda_fm * losses["FM"] + lambda_vgg * losses["VGG"]
-        loss.backward()
+        self.accelerator.backward(loss)
         self.optimizer_G.step()
 
         if step % self.config.log_interval == 0:
@@ -58,9 +65,9 @@ class Trainer:
         start_time = time.time()
 
         self.optimizer_D.zero_grad()
-        losses = self.model(data["image"], data["label"], mode="discriminator")
+        losses = self.accelerator.unwrap_model(self.model).loss_discriminator(data["image"], data["label"])
         loss = sum(losses.values()).mean()
-        loss.backward()
+        self.accelerator.backward(loss)
         self.optimizer_D.step()
 
         if step % self.config.log_interval == 0:
@@ -80,4 +87,5 @@ class Trainer:
         self.logger.info(f"learning rate in next epoch G: {lr_G}, D: {lr_D}")
 
     def save(self, epoch: int):
-        self.model.save(epoch)
+        self.accelerator.wait_for_everyone()
+        self.model.save(epoch, self.accelerator)

@@ -16,7 +16,7 @@ class Generator(nn.Module):
         self.config = config
         self.dim = self.CROP_SIZE // (2**self.N_LAYERS)
 
-        self.Zencoder = Zencoder().to(config.device)
+        self.Zencoder = Zencoder()
 
         self.fc = nn.Conv2d(config.label_nc, 1024, kernel_size=3, padding=1)
         self.up = nn.Upsample(scale_factor=2)

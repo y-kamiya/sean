@@ -7,7 +7,7 @@ from .network import VGG19
 class GANLoss(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.zero_tensor = torch.tensor(0, device=config.device)
+        self.zero_tensor = torch.tensor(0)
 
     def loss(self, x, is_real, is_discriminator):
         if not is_discriminator:
@@ -29,7 +29,8 @@ class FeatureMatchingLoss(nn.Module):
         self.loss = nn.L1Loss()
 
     def __call__(self, preds_fake, preds_real):
-        loss = torch.zeros(1, dtype=torch.float, device=self.config.device)
+        device = preds_fake[0][0].device
+        loss = torch.zeros(1, dtype=torch.float, device=device)
         n_discriminator = len(preds_fake)
         for k in range(n_discriminator):
             # except for last block output
@@ -42,7 +43,7 @@ class FeatureMatchingLoss(nn.Module):
 class VGGLoss(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.vgg = VGG19().to(config.device)
+        self.vgg = VGG19()
         self.loss = nn.L1Loss()
         self.weights = [1.0 / m for m in [32, 16, 8, 4, 1]]
 

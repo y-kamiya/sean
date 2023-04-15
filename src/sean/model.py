@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
 from PIL import Image
+from accelerate import Accelerator
 
 from .network import Generator, MultiscaleDiscriminator
 from .loss import GANLoss, FeatureMatchingLoss, VGGLoss
@@ -46,14 +47,14 @@ class SEAN(nn.Module):
     def __init__(self, config: TrainerConfig):
         super().__init__()
         self.config = config
-        self.generator = Generator(config).to(config.device)
+        self.generator = Generator(config)
         self.generator.apply(self.init_weights)
-        self.discriminator = MultiscaleDiscriminator(config).to(config.device)
+        self.discriminator = MultiscaleDiscriminator(config)
         self.discriminator.apply(self.init_weights)
 
-        self.criterionGAN = GANLoss(config).to(config.device)
-        self.criterionFM = FeatureMatchingLoss(config).to(config.device)
-        self.criterionVGG = VGGLoss(config).to(config.device)
+        self.criterionGAN = GANLoss(config)
+        self.criterionFM = FeatureMatchingLoss(config)
+        self.criterionVGG = VGGLoss(config)
 
         self.transform_image = self.build_transform()
         self.transform_label = self.build_transform(Image.Resampling.NEAREST, False)
@@ -80,18 +81,10 @@ class SEAN(nn.Module):
             if hasattr(m, "bias") and m.bias is not None:
                 nn.init.constant_(m.bias.data, 0.0)
 
-    def forward(self, image, label, mode):
-        if mode == "generator":
-            return self.loss_generator(image, self.build_label(label))
-        elif mode == "discriminator":
-            return self.loss_discriminator(image, self.build_label(label))
-        else:
-            raise ValueError(f"mode: {mode} is not defined")
-
-    def loss_generator(self, real, seg):
+    def loss_generator(self, real, label):
+        seg = self.build_label(label)
         style_codes = self.generator.encode(real, seg)
         fake = self.generator(seg, style_codes)
-        print(fake.shape, real.shape)
         fake_output, real_output = self.discriminate(seg, fake, real)
 
         losses = {
@@ -101,8 +94,9 @@ class SEAN(nn.Module):
         }
         return losses, fake
 
-    def loss_discriminator(self, real, seg):
+    def loss_discriminator(self, real, label):
         with torch.no_grad():
+            seg = self.build_label(label)
             style_codes = self.generator.encode(real, seg)
             fake = self.generator(seg, style_codes).detach()
             fake.requires_grad_()
@@ -181,8 +175,8 @@ class SEAN(nn.Module):
         optimizer_D = torch.optim.Adam(self.discriminator.parameters(), lr=lr_D, betas=(0, 0.9))
         return optimizer_G, optimizer_D
 
-    def save(self, epoch: int):
+    def save(self, epoch: int, accelerator: Accelerator):
         model_path = os.path.join(self.config.model_dir, f"netG_{epoch}.pth")
-        torch.save(self.generator.state_dict(), model_path)
+        accelerator.save(accelerator.unwrap_model(self.generator).state_dict(), model_path)
         model_path = os.path.join(self.config.model_dir, f"netD_{epoch}.pth")
-        torch.save(self.discriminator.state_dict(), model_path)
+        accelerator.save(accelerator.unwrap_model(self.discriminator).state_dict(), model_path)

@@ -19,6 +19,7 @@ torchvision = [
 argparse-dataclass = "^1.0.0"
 logzero = "^1.7.0"
 tensorboard = "^2.12.1"
+accelerate = "^0.18.0"
 
 
 [tool.poetry.group.dev.dependencies]

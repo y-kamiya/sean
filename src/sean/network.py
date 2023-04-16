@@ -63,9 +63,7 @@ class MultiscaleDiscriminator(nn.Module):
 
     def forward(self, x):
         x0 = self.discriminator0(x)
-        print(x.shape)
         x = self.downsample(x)
-        print(x.shape)
         x1 = self.discriminator1(x)
         return [x0, x1]
 
@@ -79,8 +77,7 @@ class Discriminator(nn.Module):
         self.add_module("block0", DiscriminatorBlock(fin, 64, use_norm=False))
         self.add_module("block1", DiscriminatorBlock(64, 128))
         self.add_module("block2", DiscriminatorBlock(128, 256))
-        self.add_module("block3", DiscriminatorBlock(256, 512))
-        self.add_module("block4", DiscriminatorBlock(512, 1, stride=1, use_norm=False, use_act=False))
+        self.add_module("block3", DiscriminatorBlock(256, 1, stride=1, use_norm=False, use_act=False))
 
     def forward(self, x):
         output = []

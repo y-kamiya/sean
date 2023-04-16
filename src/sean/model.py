@@ -26,15 +26,18 @@ class Config:
 class TrainerConfig:
     device_name: str = "cuda"
     device: torch.device = torch.device("cuda")
+    name: str = "default"
     dataroot: str = "data"
+    output_dir: str = "output"
     model_dir: Optional[str] = None
     batch_size: int = 2
     label_nc: int = 19
     output_nc: int = 3
     model_path: Optional[str] = None
     epochs: int = 4
-    log_interval: int = 1
-    eval_interval: int = 1
+    log_steps_by: int = 1
+    log_image_steps_by: int = 1
+    save_epochs_by: int = 1
     lr: float = 0.0002
     lambda_fm: float = 10.0
     lambda_vgg: float = 10.0

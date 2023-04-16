@@ -15,6 +15,7 @@ class ImageMaskDataset(Dataset):
         self.is_train = phase == "train"
         self.image_paths = sorted(self.make_dataset(os.path.join(config.dataroot, phase, "images")))
         self.label_paths = sorted(self.make_dataset(os.path.join(config.dataroot, phase, "labels")))
+        self.colormap = self.build_colormap(config.label_nc)
 
     @classmethod
     def is_image_file(self, fname):
@@ -64,11 +65,45 @@ class ImageMaskDataset(Dataset):
         return label, image
 
     @classmethod
-    def postprocess(cls, tensor):
-        image = tensor.detach().cpu().float().numpy()
-        image = (np.transpose(image, (1, 2, 0)) + 1) / 2.0 * 255.0
-        image = np.clip(image, 0, 255)
-        return Image.fromarray(image.astype(np.uint8))
+    def postprocess(cls, tensor, is_tensor=False):
+        tensor = (tensor + 1) / 2.0 * 255.0
+        tensor = torch.clamp(tensor, 0, 255).to(dtype=torch.uint8)
+        if is_tensor:
+            return tensor.cpu()
+
+        tensor = tensor.permute(1, 2, 0)
+        return Image.fromarray(tensor.detach().cpu().float().numpy())
+
+    def colorize(self, tensor):
+        _, h, w = tensor.shape
+        image = torch.zeros((3, h, w), dtype=torch.uint8)
+        for label_id in range(len(self.colormap)):
+            mask = (label_id == tensor[0]).cpu()
+            image[0][mask] = self.colormap[0][label_id]
+            image[1][mask] = self.colormap[1][label_id]
+            image[2][mask] = self.colormap[2][label_id]
+
+        return image.to(dtype=torch.uint8)
+
+    def build_colormap(self, n: int):
+        def bitget(byteval, idx):
+            return ((byteval & (1 << idx)) != 0)
+
+        cmap = torch.zeros((3, n), dtype=torch.uint8)
+        for i in range(n):
+            r = g = b = 0
+            c = i + 1
+            for j in range(8):
+                r = r | (bitget(c, 0) << 7-j)
+                g = g | (bitget(c, 1) << 7-j)
+                b = b | (bitget(c, 2) << 7-j)
+                c = c >> 3
+
+            cmap[0][i] = r
+            cmap[1][i] = g
+            cmap[2][i] = b
+
+        return cmap
 
     def build_params(self, is_flip=True):
         x_max = self.config.load_size - self.config.crop_size

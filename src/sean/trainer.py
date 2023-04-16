@@ -1,14 +1,15 @@
 import time
 import torch
+from pathlib import Path
 from logging import Logger
 from torch.utils.data import DataLoader, Dataset
 from torch.utils import tensorboard
 from torch.optim.lr_scheduler import LinearLR
-from dataclasses import dataclass
 from typing import Optional
 from accelerate import Accelerator
 
 from .model import SEAN, TrainerConfig
+from .dataset import ImageMaskDataset
 
 
 class Trainer:
@@ -27,17 +28,23 @@ class Trainer:
         self.model, self.optimizer_G, self.optimizer_D, self.dataloader, self.schedulerG, self.schedulerD = \
             self.accelerator.prepare(self.model, self.optimizer_G, self.optimizer_D, self.dataloader, self.schedulerG, self.schedulerD)
 
+        self.steps = -1
+        self.writer = tensorboard.SummaryWriter(comment=config.name)
+
     def train(self):
         for epoch in range(self.config.epochs):
             self.train_epoch(epoch, self.dataloader)
 
-            if epoch % self.config.eval_interval == 0:
+            if epoch % self.config.save_epochs_by == 0:
                 self.save(epoch)
+
+        self.writer.close()
 
     def train_epoch(self, epoch: int, dataloader: DataLoader):
         start_time = time.time()
 
         for i, data in enumerate(self.dataloader):
+            self.steps += 1
             self.train_generator(i, data)
             self.train_discriminator(i, data)
 
@@ -51,15 +58,27 @@ class Trainer:
 
         self.optimizer_G.zero_grad()
         losses, generated = self.accelerator.unwrap_model(self.model).loss_generator(data["image"], data["label"])
-        lambda_fm = self.config.lambda_fm
-        lambda_vgg = self.config.lambda_vgg
-        loss = losses["GAN"] + lambda_fm * losses["FM"] + lambda_vgg * losses["VGG"]
+        losses["FM"] *= self.config.lambda_fm
+        losses["VGG"] *= self.config.lambda_vgg
+        loss = losses["GAN"] + losses["FM"] + losses["VGG"]
         self.accelerator.backward(loss)
         self.optimizer_G.step()
 
-        if step % self.config.log_interval == 0:
-            elapsed = time.time() - start_time
-            self.logger.info(f"[train G] step: {step}, loss: {loss.item():.3f}, time: {elapsed:.2f}")
+        if self.steps % self.config.log_steps_by == 0:
+            end_time = time.time()
+            elapsed = end_time - start_time
+            msg = "[train G] step: {}, GAN: {:.3f}, FM: {:.3f}, VGG: {:.3f}, loss: {:.3f}, time: {:.2f}"
+            self.logger.info(msg.format(
+                step, losses['GAN'].item(), losses['FM'].item(), losses['VGG'].item(), loss.item(), elapsed))
+
+            if self.accelerator.is_main_process:
+                self.writer.add_scalar("loss/trainG/GANloss", losses['GAN'], self.steps, end_time)
+                self.writer.add_scalar("loss/trainG/FMloss", losses['FM'], self.steps, end_time)
+                self.writer.add_scalar("loss/trainG/VGGloss", losses['VGG'], self.steps, end_time)
+                self.writer.add_scalar("loss/trainG/total", loss, self.steps, end_time)
+
+        if self.steps % self.config.log_image_steps_by == 0 and self.accelerator.is_main_process:
+            self.log_images(generated, data["image"], data["label"])
 
     def train_discriminator(self, step: int, data):
         start_time = time.time()
@@ -70,22 +89,44 @@ class Trainer:
         self.accelerator.backward(loss)
         self.optimizer_D.step()
 
-        if step % self.config.log_interval == 0:
-            elapsed = time.time() - start_time
-            self.logger.info(f"[train D] step: {step}, loss: {loss:.3f}, time: {elapsed:.2f}")
+        if self.steps % self.config.log_steps_by == 0:
+            end_time = time.time()
+            elapsed = end_time - start_time
+            msg = "[train D] step: {}, fake: {:.3f}, real: {:.3f}, loss: {:.3f}, time: {:.2f}"
+            self.logger.info(msg.format(
+                step, losses['GAN_fake'].item(), losses['GAN_real'].item(), loss, elapsed))
+
+            if self.accelerator.is_main_process:
+                self.writer.add_scalar("loss/trainD/fake_loss", losses['GAN_fake'], self.steps, end_time)
+                self.writer.add_scalar("loss/trainD/real_loss", losses['GAN_real'], self.steps, end_time)
+                self.writer.add_scalar("loss/trainD/total", loss, self.steps, end_time)
 
     def update_learning_rate(self, epoch: int):
-        print(epoch, self.lr_decay_start)
+        if self.accelerator.is_main_process:
+            t = time.time()
+            lr_G = self.optimizer_G.param_groups[0]["lr"]
+            lr_D = self.optimizer_D.param_groups[0]["lr"]
+            self.logger.info(f"learning rate in this epoch G: {lr_G}, D: {lr_D}")
+            self.writer.add_scalar("lr/trainG", lr_G, epoch, t)
+            self.writer.add_scalar("lr/trainD", lr_D, epoch, t)
+
         if epoch < self.lr_decay_start:
             return
 
         self.schedulerG.step()
         self.schedulerD.step()
 
-        lr_G = self.optimizer_G.param_groups[0]["lr"]
-        lr_D = self.optimizer_D.param_groups[0]["lr"]
-        self.logger.info(f"learning rate in next epoch G: {lr_G}, D: {lr_D}")
-
     def save(self, epoch: int):
         self.accelerator.wait_for_everyone()
-        self.model.save(epoch, self.accelerator)
+        if self.accelerator.is_main_process:
+            self.model.save(epoch, self.accelerator)
+
+    def log_images(self, fake, real, label):
+        dataset = self.dataloader.dataset
+        t = time.time()
+        tensor = torch.cat([
+            dataset.postprocess(fake[0], True).unsqueeze(0),
+            dataset.postprocess(real[0], True).unsqueeze(0),
+            dataset.colorize(label[0]).unsqueeze(0),
+        ])
+        self.writer.add_images("image", tensor, self.steps, t)

@@ -119,7 +119,7 @@ class Trainer:
     def save(self, epoch: int):
         self.accelerator.wait_for_everyone()
         if self.accelerator.is_main_process:
-            self.model.save(epoch, self.accelerator)
+            self.accelerator.unwrap_model(self.model).save(epoch, self.accelerator)
 
     def log_images(self, fake, real, label):
         dataset = self.dataloader.dataset

@@ -179,7 +179,9 @@ class SEAN(nn.Module):
         return optimizer_G, optimizer_D
 
     def save(self, epoch: int, accelerator: Accelerator):
+        if self.config.model_dir is None:
+            return
         model_path = os.path.join(self.config.model_dir, f"netG_{epoch}.pth")
-        accelerator.save(accelerator.unwrap_model(self.generator).state_dict(), model_path)
+        accelerator.save(self.generator.state_dict(), model_path)
         model_path = os.path.join(self.config.model_dir, f"netD_{epoch}.pth")
-        accelerator.save(accelerator.unwrap_model(self.discriminator).state_dict(), model_path)
+        accelerator.save(self.discriminator.state_dict(), model_path)

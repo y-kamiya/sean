@@ -1,5 +1,6 @@
 import time
 import torch
+from datetime import datetime
 from pathlib import Path
 from logging import Logger
 from torch.utils.data import DataLoader, Dataset
@@ -29,7 +30,11 @@ class Trainer:
             self.accelerator.prepare(self.model, self.optimizer_G, self.optimizer_D, self.dataloader, self.schedulerG, self.schedulerD)
 
         self.steps = -1
-        self.writer = tensorboard.SummaryWriter(comment=config.name)
+
+        if self.accelerator.is_main_process:
+            logdir = Path(config.output_dir) / "runs" / config.name
+            dt = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.writer = tensorboard.SummaryWriter(f"{logdir}_{dt}")
 
     def train(self):
         for epoch in range(self.config.epochs):
@@ -38,7 +43,8 @@ class Trainer:
             if epoch % self.config.save_epochs_by == 0:
                 self.save(epoch)
 
-        self.writer.close()
+        if self.accelerator.is_main_process:
+            self.writer.close()
 
     def train_epoch(self, epoch: int, dataloader: DataLoader):
         start_time = time.time()

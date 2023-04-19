@@ -4,8 +4,6 @@ import torch.nn.functional as F
 import torch.nn.utils.spectral_norm as spectral_norm
 from torchvision.models import vgg19
 
-from .batchnorm import SynchronizedBatchNorm2d
-
 
 class Generator(nn.Module):
     CROP_SIZE = 256
@@ -198,7 +196,7 @@ class ACE(nn.Module):
         self.blending_beta = nn.Parameter(torch.zeros(1), requires_grad=True)
         self.noise_var = nn.Parameter(torch.zeros(fin), requires_grad=True)
 
-        self.param_free_norm = SynchronizedBatchNorm2d(fin, affine=False)
+        self.param_free_norm = nn.BatchNorm2d(fin, affine=False)
         self.Spade = SPADE(label_nc, fin)
         if apply_style:
             self.per_style_convs = nn.ModuleList([nn.Linear(self.N_STYLES, self.N_STYLES) for _ in range(label_nc)])

@@ -19,14 +19,15 @@ class Trainer:
         self.logger = logger
         self.dataloader = dataloader
 
+        self.accelerator = Accelerator(split_batches=True)
         self.model = SEAN(config)
-        self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
+        if self.accelerator.num_processes > 1:
+            self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
         self.optimizer_G, self.optimizer_D = self.model.create_optimizers()
         self.lr_decay_start = config.epochs // 2
         self.schedulerG = LinearLR(self.optimizer_G, 1.0, 0.0, self.lr_decay_start)
         self.schedulerD = LinearLR(self.optimizer_D, 1.0, 0.0, self.lr_decay_start)
 
-        self.accelerator = Accelerator(split_batches=True)
         self.model, self.optimizer_G, self.optimizer_D, self.dataloader, self.schedulerG, self.schedulerD = \
             self.accelerator.prepare(self.model, self.optimizer_G, self.optimizer_D, self.dataloader, self.schedulerG, self.schedulerD)
 

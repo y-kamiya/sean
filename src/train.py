@@ -12,7 +12,7 @@ def main():
     args = parser.parse_args()
     args.device = torch.device(args.device_name)
 
-    args.model_dir = os.path.join(args.output_dir, "models")
+    args.model_dir = os.path.join(args.output_dir, "models", args.name)
     os.makedirs(args.model_dir, exist_ok=True)
 
     logger = setup_logger(name=__name__)

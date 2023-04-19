@@ -8,6 +8,8 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 from PIL import Image
 from accelerate import Accelerator
+import sys
+import torchinfo
 
 from .network import Generator, MultiscaleDiscriminator
 from .loss import GANLoss, FeatureMatchingLoss, VGGLoss
@@ -87,8 +89,11 @@ class SEAN(nn.Module):
     def loss_generator(self, real, label):
         seg = self.build_label(label)
         style_codes = self.generator.encode(real, seg)
+        print("----------------------- Gen")
+        torchinfo.summary(self.generator, input_data=[seg, style_codes], mode="train")
         fake = self.generator(seg, style_codes)
         fake_output, real_output = self.discriminate(seg, fake, real)
+        sys.exit()
 
         losses = {
             "GAN": self.criterionGAN(fake_output, is_discriminator=False),
@@ -115,6 +120,8 @@ class SEAN(nn.Module):
         real_input = torch.cat([seg, real], dim=1)
 
         batch = torch.cat([fake_input, real_input], dim=0)
+        print("----------------------- Dis")
+        torchinfo.summary(self.discriminator, input_data=[batch], mode="train")
         output = self.discriminator(batch)
 
         fake_output = [[o[:o.size(0) // 2] for o in out] for out in output]

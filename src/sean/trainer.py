@@ -20,7 +20,7 @@ class Trainer:
         self.dataloader = dataloader
 
         self.model = SEAN(config)
-        self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
+        # self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
         self.optimizer_G, self.optimizer_D = self.model.create_optimizers()
         self.lr_decay_start = config.epochs // 2
         self.schedulerG = LinearLR(self.optimizer_G, 1.0, 0.0, self.lr_decay_start)

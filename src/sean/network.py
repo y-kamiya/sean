@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import torch.nn.utils.spectral_norm as spectral_norm
 from torchvision.models import vgg19
 
+import torchinfo
 
 class Generator(nn.Module):
     CROP_SIZE = 256
@@ -49,6 +50,8 @@ class Generator(nn.Module):
         return x
 
     def encode(self, image, seg):
+        print("----------------------- Zencoder")
+        torchinfo.summary(self.Zencoder, input_data=[image, seg], mode="train")
         return self.Zencoder(image, seg)
 
 

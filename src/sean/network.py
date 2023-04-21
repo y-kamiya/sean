@@ -6,13 +6,12 @@ from torchvision.models import vgg19
 
 
 class Generator(nn.Module):
-    CROP_SIZE = 256
     N_LAYERS = 5
 
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.dim = self.CROP_SIZE // (2**self.N_LAYERS)
+        self.dim = config.crop_size // (2**self.N_LAYERS)
 
         self.Zencoder = Zencoder()
 

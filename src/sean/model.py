@@ -61,9 +61,6 @@ class SEAN(nn.Module):
         self.criterionFM = FeatureMatchingLoss(config)
         self.criterionVGG = VGGLoss(config)
 
-        self.transform_image = self.build_transform()
-        self.transform_label = self.build_transform(Image.Resampling.NEAREST, False)
-
         if config.model_path is not None:
             data = torch.load(config.model_path, map_location=config.device)
             for key in list(data.keys()):
@@ -136,42 +133,6 @@ class SEAN(nn.Module):
         label = label.to(dtype=torch.int64)
         input_label = torch.zeros((b, self.config.label_nc, h, w)).to(device=self.config.device, dtype=torch.float)
         return input_label.scatter_(1, label, 1.0)
-
-    def preprocess(self, label_pil, image_pil=None):
-        image = None
-        if image_pil is not None:
-            image = self.transform_image(image_pil).unsqueeze(0).to(self.config.device)
-
-        label = self.transform_label(label_pil).unsqueeze(0).to(self.config.device)
-        label = label * 255.0
-        label[label == 255] = 182
-        return label, image
-
-    def postprocess(self, tensor):
-        image = tensor.detach().cpu().float().numpy()
-        image = (np.transpose(image, (1, 2, 0)) + 1) / 2.0 * 255.0
-        image = np.clip(image, 0, 255)
-        return Image.fromarray(image.astype(np.uint8))
-
-    def build_transform(self, method=Image.Resampling.BICUBIC, normalize=True):
-        transform_list = [
-            transforms.Lambda(lambda img: self.scale_width(img, 512, method)),
-            transforms.CenterCrop(512),
-            transforms.ToTensor(),
-        ]
-
-        if normalize:
-            base = (0.5, 0.5, 0.5)
-            transform_list.append(transforms.Normalize(base, base))
-
-        return transforms.Compose(transform_list)
-
-    def scale_width(self, img, width, method):
-        w, h = img.size
-        if w == width:
-            return img
-        h = int(width * h / w)
-        return img.resize((width, h), method)
 
     def create_optimizers(self):
         lr_G = self.config.lr / 2

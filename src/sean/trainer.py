@@ -3,14 +3,13 @@ import torch
 from datetime import datetime
 from pathlib import Path
 from logging import Logger
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from torch.utils import tensorboard
 from torch.optim.lr_scheduler import LinearLR
 from typing import Optional
 from accelerate import Accelerator
 
 from .model import SEAN, TrainerConfig
-from .dataset import ImageMaskDataset
 
 
 class Trainer:

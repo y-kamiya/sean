@@ -3,43 +3,21 @@ import random
 import numpy as np
 import torch
 import torchvision.transforms as transforms
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from PIL import Image, ImageFile
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
-class ImageMaskDataset(Dataset):
-    IMG_EXTENSIONS = ['.png', 'jpg', "jpeg"]
-
+class BaseDataset(Dataset):
     def __init__(self, config, phase="train"):
         self.config = config
         self.is_train = phase == "train"
-        self.image_paths = sorted(self.make_dataset(os.path.join(config.dataroot, phase, "images")))
-        self.label_paths = sorted(self.make_dataset(os.path.join(config.dataroot, phase, "labels")))
         self.colormap = self.build_colormap(config.label_nc)
 
-    @classmethod
-    def is_image_file(self, fname):
-        return any(fname.endswith(ext) for ext in self.IMG_EXTENSIONS)
-
-    @classmethod
-    def make_dataset(self, dir):
-        images = []
-        assert os.path.isdir(dir), '%s is not a valid directory' % dir
-
-        for root, _, fnames in sorted(os.walk(dir)):
-            for fname in fnames:
-                if self.is_image_file(fname):
-                    path = os.path.join(root, fname)
-                    images.append(path)
-        return images
-
     def __getitem__(self, index):
-        label_path = self.label_paths[index]
-        label_pil = Image.open(label_path)
-        image_path = self.image_paths[index]
-        image_pil = Image.open(image_path).convert('RGB')
+        image_pil = self.get_image(index)
+        label_pil = self.get_label(index)
 
         label_tensor, image_tensor = self.preprocess(label_pil, image_pil)
 
@@ -48,8 +26,11 @@ class ImageMaskDataset(Dataset):
             "image": image_tensor,
         }
 
-    def __len__(self):
-        return len(self.image_paths)
+    def get_image(self, index):
+        raise NotImplementedError
+
+    def get_label(self, index):
+        raise NotImplementedError
 
     def preprocess(self, label_pil, image_pil=None):
         params = self.build_params(self.is_train)
@@ -74,7 +55,7 @@ class ImageMaskDataset(Dataset):
             return tensor.cpu()
 
         tensor = tensor.permute(1, 2, 0)
-        return Image.fromarray(tensor.detach().cpu().float().numpy())
+        return Image.fromarray(tensor.detach().cpu().numpy())
 
     def colorize(self, tensor):
         _, h, w = tensor.shape
@@ -138,3 +119,56 @@ class ImageMaskDataset(Dataset):
             return img
         h = int(width * h / w)
         return img.resize((width, h), method)
+
+
+class StorageDataset(BaseDataset):
+    IMG_EXTENSIONS = ['.png', 'jpg', "jpeg"]
+
+    def __init__(self, config, phase="train"):
+        super().__init__(config, phase)
+        self.image_paths = sorted(self.make_dataset(os.path.join(config.dataroot, phase, "images")))
+        self.label_paths = sorted(self.make_dataset(os.path.join(config.dataroot, phase, "labels")))
+
+    @classmethod
+    def is_image_file(self, fname):
+        return any(fname.endswith(ext) for ext in self.IMG_EXTENSIONS)
+
+    @classmethod
+    def make_dataset(self, dir):
+        images = []
+        assert os.path.isdir(dir), '%s is not a valid directory' % dir
+
+        for root, _, fnames in sorted(os.walk(dir)):
+            for fname in fnames:
+                if self.is_image_file(fname):
+                    path = os.path.join(root, fname)
+                    images.append(path)
+        return images
+
+    def get_image(self, index):
+        image_path = self.image_paths[index]
+        return Image.open(image_path).convert('RGB')
+
+    def get_label(self, index):
+        label_path = self.label_paths[index]
+        return Image.open(label_path)
+
+    def __len__(self):
+        return len(self.image_paths)
+
+
+class MemoryDataset(BaseDataset):
+    def __init__(self, config, images: list[Image], labels: list[Image], phase="test"):
+        assert len(images) == len(labels), f"images: {len(images)}, labels: {len(labels)}: should be same number"
+        super().__init__(config, phase)
+        self.images = images
+        self.labels = labels
+
+    def get_image(self, index):
+        return self.images[index]
+
+    def get_label(self, index):
+        return self.labels[index]
+
+    def __len__(self):
+        return len(self.images)

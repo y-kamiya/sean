@@ -4,7 +4,7 @@ from argparse_dataclass import ArgumentParser
 from logzero import setup_logger
 
 from sean.trainer import Trainer, TrainerConfig
-from sean.dataset import ImageMaskDataset
+from sean.dataset import StorageDataset
 
 
 def main():
@@ -18,7 +18,7 @@ def main():
     logger = setup_logger(name=__name__)
     logger.info(args)
 
-    dataset = ImageMaskDataset(args)
+    dataset = StorageDataset(args)
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=args.batch_size,

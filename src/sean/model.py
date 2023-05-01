@@ -33,6 +33,8 @@ class TrainerConfig:
     batch_size: int = 2
     label_nc: int = 19
     output_nc: int = 3
+    beta1: float = 0.5
+    beta2: float = 0.999
     model_path: Optional[str] = None
     epochs: int = 4
     log_steps_by: int = 1
@@ -174,8 +176,9 @@ class SEAN(nn.Module):
     def create_optimizers(self):
         lr_G = self.config.lr / 2
         lr_D = self.config.lr * 2
-        optimizer_G = torch.optim.Adam(self.generator.parameters(), lr=lr_G, betas=(0, 0.9))
-        optimizer_D = torch.optim.Adam(self.discriminator.parameters(), lr=lr_D, betas=(0, 0.9))
+        betas = (self.config.beta1, self.config.beta2)
+        optimizer_G = torch.optim.Adam(self.generator.parameters(), lr=lr_G, betas=betas)
+        optimizer_D = torch.optim.Adam(self.discriminator.parameters(), lr=lr_D, betas=betas)
         return optimizer_G, optimizer_D
 
     def save(self, epoch: int, accelerator: Accelerator):

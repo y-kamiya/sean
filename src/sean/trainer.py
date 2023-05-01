@@ -9,11 +9,12 @@ from torch.optim.lr_scheduler import LinearLR
 from typing import Optional
 from accelerate import Accelerator
 
-from .model import SEAN, TrainerConfig
+from .config import Config
+from .model import SEAN
 
 
 class Trainer:
-    def __init__(self, config: TrainerConfig, logger: Logger, dataloader: DataLoader):
+    def __init__(self, config: Config, logger: Logger, dataloader: DataLoader):
         self.config = config
         self.logger = logger
         self.dataloader = dataloader

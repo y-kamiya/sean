@@ -1,55 +1,15 @@
-from dataclasses import dataclass
-from typing import Optional
-
 import os
-import numpy as np
 import torch
 import torch.nn as nn
-import torchvision.transforms as transforms
-from PIL import Image
 from accelerate import Accelerator
 
+from .config import Config
 from .network import Generator, MultiscaleDiscriminator
 from .loss import GANLoss, FeatureMatchingLoss, VGGLoss
 
 
-@dataclass
-class Config:
-    device_name: str = "cuda"
-    device: torch.device = torch.device("cuda")
-    label_nc: int = 19
-    output_nc: int = 3
-    model_path: Optional[str] = None
-
-
-@dataclass
-class TrainerConfig:
-    device_name: str = "cuda"
-    device: torch.device = torch.device("cuda")
-    name: str = "default"
-    dataroot: str = "data"
-    output_dir: str = "output"
-    model_dir: Optional[str] = None
-    batch_size: int = 2
-    label_nc: int = 19
-    output_nc: int = 3
-    beta1: float = 0.5
-    beta2: float = 0.999
-    model_path: Optional[str] = None
-    epochs: int = 4
-    log_steps_by: int = 1
-    log_image_steps_by: int = 1
-    save_epochs_by: int = 1
-    lr: float = 0.0002
-    lambda_fm: float = 10.0
-    lambda_vgg: float = 10.0
-    load_size: int = 256
-    crop_size: int = 256
-    n_workers: int = 1
-
-
 class SEAN(nn.Module):
-    def __init__(self, config: TrainerConfig):
+    def __init__(self, config: Config):
         super().__init__()
         self.config = config
         self.generator = Generator(config)

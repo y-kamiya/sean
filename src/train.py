@@ -3,12 +3,13 @@ import torch
 from argparse_dataclass import ArgumentParser
 from logzero import setup_logger
 
-from sean.trainer import Trainer, TrainerConfig
+from sean.config import Config
+from sean.trainer import Trainer
 from sean.dataset import StorageDataset
 
 
 def main():
-    parser = ArgumentParser(TrainerConfig)
+    parser = ArgumentParser(Config)
     args = parser.parse_args()
     args.device = torch.device(args.device_name)
 

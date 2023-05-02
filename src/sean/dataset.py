@@ -60,7 +60,7 @@ class BaseDataset(Dataset):
     def colorize(self, tensor):
         _, h, w = tensor.shape
         image = torch.zeros((3, h, w), dtype=torch.uint8)
-        for label_id in range(len(self.colormap)):
+        for label_id in range(len(self.colormap[0])):
             mask = (label_id == tensor[0]).cpu()
             image[0][mask] = self.colormap[0][label_id]
             image[1][mask] = self.colormap[1][label_id]

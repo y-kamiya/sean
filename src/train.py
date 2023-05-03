@@ -14,7 +14,9 @@ def main():
     args.device = torch.device(args.device_name)
 
     args.model_dir = os.path.join(args.output_dir, "models", args.name)
+    args.checkpoint_dir = os.path.join(args.output_dir, "checkpoints", args.name)
     os.makedirs(args.model_dir, exist_ok=True)
+    os.makedirs(args.checkpoint_dir, exist_ok=True)
 
     logger = setup_logger(name=__name__)
     logger.info(args)

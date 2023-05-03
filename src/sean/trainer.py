@@ -32,15 +32,24 @@ class Trainer:
             self.accelerator.prepare(self.model, self.optimizer_G, self.optimizer_D, self.dataloader, self.schedulerG, self.schedulerD)
 
         self.steps = -1
+        self.start_epoch = 0
+        dt = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.tensorboard_dir = Path(config.output_dir) / "runs" / f"{config.name}_{dt}"
+        self.extra_checkpoint_path = Path(config.checkpoint_dir) / "extra.pth"
+
+        if config.from_checkpoint:
+            self.load_state()
 
         if self.accelerator.is_main_process:
-            logdir = Path(config.output_dir) / "runs" / config.name
-            dt = datetime.now().strftime("%Y%m%d_%H%M%S")
-            self.writer = tensorboard.SummaryWriter(f"{logdir}_{dt}")
+            self.writer = tensorboard.SummaryWriter(self.tensorboard_dir, purge_step=self.steps)
 
     def train(self):
-        for epoch in range(self.config.epochs):
+        if self.start_epoch >= self.config.epochs:
+            raise ValueError("config.epochs should be greater than start_epoch")
+
+        for epoch in range(self.start_epoch, self.config.epochs):
             self.train_epoch(epoch, self.dataloader)
+            self.save_state(epoch)
 
             if epoch % self.config.save_epochs_by == 0:
                 self.save(epoch)
@@ -128,6 +137,28 @@ class Trainer:
         self.accelerator.wait_for_everyone()
         if self.accelerator.is_main_process:
             self.accelerator.unwrap_model(self.model).save(epoch, self.accelerator)
+
+    def save_state(self, epoch: int):
+        if not self.accelerator.is_main_process:
+            return
+
+        self.accelerator.save_state(self.config.checkpoint_dir)
+        data = {
+            "steps": self.steps,
+            "epochs": epoch,
+            "tensorboard_dir": self.tensorboard_dir,
+        }
+        torch.save(data, self.extra_checkpoint_path)
+
+    def load_state(self):
+        self.accelerator.load_state(self.config.checkpoint_dir)
+
+        data = torch.load(self.extra_checkpoint_path, map_location=self.config.device)
+        self.steps = data["steps"]
+        self.start_epoch = data["epochs"] + 1
+        self.tensorboard_dir = data["tensorboard_dir"]
+
+        self.logger.info(f"restart from epoch: {self.start_epoch}, steps: {self.steps + 1}")
 
     def log_images(self, fake, real, label):
         dataset = self.dataloader.dataset

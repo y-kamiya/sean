@@ -17,6 +17,7 @@ class Config:
     name: str = "default"
     dataroot: str = "data"
     model_dir: Optional[str] = None
+    checkpoint_dir: str = ""
     batch_size: int = 2
     beta1: float = 0.5
     beta2: float = 0.999
@@ -28,3 +29,4 @@ class Config:
     lambda_fm: float = 10.0
     lambda_vgg: float = 10.0
     n_workers: int = 1
+    from_checkpoint: bool = False

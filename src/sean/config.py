@@ -28,5 +28,5 @@ class Config:
     lr: float = 0.0002
     lambda_fm: float = 10.0
     lambda_vgg: float = 10.0
-    n_workers: int = 1
+    n_workers: int = 2
     from_checkpoint: bool = False

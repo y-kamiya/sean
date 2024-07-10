@@ -7,14 +7,14 @@ readme = "README.md"
 packages = [{include = "sean", from = "src"}]
 
 [tool.poetry.dependencies]
-python = "^3.8.1,<3.11"
+python = "^3.10.1"
 torch = [
-    { version = "<2.0+cpu", markers = "sys_platform == 'darwin'" },
-    { version = "<2.0+cu113", markers = "sys_platform == 'linux'" },
+    { version = "2.2.2", markers = "sys_platform == 'darwin'", source = "pypi"},
+    { version = "2.2.2", markers = "sys_platform == 'linux'", source = "torch_cu121" },
 ]
 torchvision = [
-    { version = "<1.0+cpu", markers = "sys_platform == 'darwin'" },
-    { version = "<1.0+cu113", markers = "sys_platform == 'linux'" },
+    { version = "0.17.2", markers = "sys_platform == 'darwin'", source = "pypi" },
+    { version = "0.17.2", markers = "sys_platform == 'linux'", source = "torch_cu121" },
 ]
 argparse-dataclass = "^1.0.0"
 logzero = "^1.7.0"
@@ -25,6 +25,13 @@ accelerate = "^0.18.0"
 [tool.poetry.group.dev.dependencies]
 black = "^23.1.0"
 isort = "^5.12.0"
+
+
+[[tool.poetry.source]]
+name = "torch_cu121"
+url = "https://download.pytorch.org/whl/cu121"
+priority = "explicit"
+
 
 [build-system]
 requires = ["poetry-core"]

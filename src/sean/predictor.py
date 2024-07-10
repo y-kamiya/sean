@@ -1,3 +1,4 @@
+import torch
 from torch.utils.data import DataLoader
 from PIL import Image
 
@@ -7,6 +8,7 @@ from sean.dataset import MemoryDataset
 
 class Predictor:
     def __init__(self, config: Config):
+        config.device = torch.device(config.device_name)
         self.config = config
         self.model = SEAN(config).to(device=config.device)
         self.model.eval()
